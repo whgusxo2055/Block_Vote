@@ -50,4 +50,25 @@ contract Voting {
         votingState = VotingState.ENDED;
         emit VotingEnded(block.timestamp);
     }
+
+    function vote(uint256 candidateId) external {
+        require(votingState == VotingState.ACTIVE, "Voting not active");
+        require(!hasVoted[msg.sender], "Already voted");
+        require(candidateId < candidates.length, "Invalid candidate");
+        candidates[candidateId].voteCount++;
+        hasVoted[msg.sender] = true;
+        emit Voted(msg.sender, candidateId);
+    }
+
+    function getCandidates() external view returns (Candidate[] memory) {
+        return candidates;
+    }
+
+    function getTotalVotes() external view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < candidates.length; i++) {
+            total += candidates[i].voteCount;
+        }
+        return total;
+    }
 }

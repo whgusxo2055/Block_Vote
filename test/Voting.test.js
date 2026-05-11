@@ -163,3 +163,128 @@ describe("Voting — Phase 2: 후보자 등록 + 투표 시작/종료", function
     });
   });
 });
+
+describe("Voting — Phase 3: 투표 실행 + 읽기 함수", function () {
+  let voting;
+  let owner;
+  let voter1;
+  let voter2;
+  let voter3;
+
+  beforeEach(async function () {
+    [owner, voter1, voter2, voter3] = await ethers.getSigners();
+    const VotingFactory = await ethers.getContractFactory("Voting");
+    voting = await VotingFactory.deploy();
+    // 공통 셋업: 후보자 2명 등록
+    await voting.addCandidate("후보A", "QmA");
+    await voting.addCandidate("후보B", "QmB");
+  });
+
+  // ── vote ─────────────────────────────────────────────────
+  describe("vote", function () {
+    it("SETUP 상태에서 vote 호출 시 revert된다", async function () {
+      await expect(
+        voting.connect(voter1).vote(0)
+      ).to.be.revertedWith("Voting not active");
+    });
+
+    it("유효하지 않은 candidateId로 vote 호출 시 revert된다", async function () {
+      await voting.startVoting();
+      await expect(
+        voting.connect(voter1).vote(99)
+      ).to.be.revertedWith("Invalid candidate");
+    });
+
+    it("동일 지갑이 2회 vote 호출 시 revert된다", async function () {
+      await voting.startVoting();
+      await voting.connect(voter1).vote(0);
+      await expect(
+        voting.connect(voter1).vote(0)
+      ).to.be.revertedWith("Already voted");
+    });
+
+    it("정상 투표 후 voteCount가 1 증가한다", async function () {
+      await voting.startVoting();
+      await voting.connect(voter1).vote(0);
+      const c = await voting.candidates(0);
+      expect(c.voteCount).to.equal(1);
+    });
+
+    it("정상 투표 후 hasVoted[voter]가 true가 된다", async function () {
+      await voting.startVoting();
+      await voting.connect(voter1).vote(0);
+      expect(await voting.hasVoted(voter1.address)).to.equal(true);
+    });
+
+    it("정상 투표 시 Voted 이벤트가 emit된다", async function () {
+      await voting.startVoting();
+      await expect(voting.connect(voter1).vote(0))
+        .to.emit(voting, "Voted")
+        .withArgs(voter1.address, 0);
+    });
+
+    it("ENDED 상태에서 vote 호출 시 revert된다", async function () {
+      await voting.startVoting();
+      await voting.endVoting();
+      await expect(
+        voting.connect(voter1).vote(0)
+      ).to.be.revertedWith("Voting not active");
+    });
+  });
+
+  // ── getCandidates ─────────────────────────────────────────
+  describe("getCandidates", function () {
+    it("후보자 2명 등록 후 배열 길이 2를 반환한다", async function () {
+      const list = await voting.getCandidates();
+      expect(list.length).to.equal(2);
+    });
+
+    it("반환된 후보자 데이터가 등록 내용과 일치한다", async function () {
+      const list = await voting.getCandidates();
+      expect(list[0].name).to.equal("후보A");
+      expect(list[0].photoCID).to.equal("QmA");
+      expect(list[1].name).to.equal("후보B");
+    });
+
+    it("getCandidates는 상태를 변경하지 않는다 (view 함수)", async function () {
+      await voting.getCandidates();
+      expect(await voting.votingState()).to.equal(0); // 여전히 SETUP
+    });
+  });
+
+  // ── getTotalVotes ─────────────────────────────────────────
+  describe("getTotalVotes", function () {
+    it("투표 전 getTotalVotes는 0을 반환한다", async function () {
+      expect(await voting.getTotalVotes()).to.equal(0);
+    });
+
+    it("3표 투표 후 getTotalVotes는 3을 반환한다", async function () {
+      await voting.startVoting();
+      await voting.connect(voter1).vote(0);
+      await voting.connect(voter2).vote(1);
+      await voting.connect(voter3).vote(0);
+      expect(await voting.getTotalVotes()).to.equal(3);
+    });
+  });
+
+  // ── 사이드 이펙트 ──────────────────────────────────────────
+  describe("사이드 이펙트", function () {
+    it("endVoting 후 vote 호출 시 Voting not active revert된다", async function () {
+      await voting.startVoting();
+      await voting.endVoting();
+      await expect(
+        voting.connect(voter1).vote(0)
+      ).to.be.revertedWith("Voting not active");
+    });
+
+    it("여러 투표자가 각각 1표씩 투표하면 voteCount가 정확히 집계된다", async function () {
+      await voting.startVoting();
+      await voting.connect(voter1).vote(0);
+      await voting.connect(voter2).vote(0);
+      await voting.connect(voter3).vote(1);
+      const list = await voting.getCandidates();
+      expect(list[0].voteCount).to.equal(2);
+      expect(list[1].voteCount).to.equal(1);
+    });
+  });
+});
