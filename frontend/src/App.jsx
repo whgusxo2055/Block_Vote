@@ -1,13 +1,24 @@
+import { useState, useCallback } from "react";
 import { useWallet } from "./hooks/useWallet";
 import { useVoting } from "./hooks/useVoting";
 import Header from "./components/Header";
 import CandidateCard from "./components/CandidateCard";
+import VoteButton from "./components/VoteButton";
 
 export default function App() {
   const { account, isOwner, isConnected, chainOk, connect, switchToSepolia } =
     useWallet();
-  const { candidates, votingState, hasVoted, totalVotes, loading } =
+  const { candidates, votingState, hasVoted, totalVotes, loading, castVote, voting } =
     useVoting(account);
+
+  const [toast, setToast] = useState(null);
+
+  const handleVoteResult = useCallback((result) => {
+    const message = result.success ? "투표가 완료되었습니다!" : result.message;
+    const type = result.success ? "success" : "error";
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
 
   const maxVotes =
     candidates.length > 0 ? Math.max(...candidates.map((c) => c.voteCount)) : 0;
@@ -22,6 +33,9 @@ export default function App() {
         isOwner={isOwner}
         connect={connect}
       />
+
+      {toast && <Toast message={toast.message} type={toast.type} />}
+
       {isConnected && !chainOk ? (
         <NetworkErrorScreen switchToSepolia={switchToSepolia} />
       ) : loading ? (
@@ -37,6 +51,9 @@ export default function App() {
             maxVotes={maxVotes}
             hasVoted={hasVoted}
             isConnected={isConnected}
+            castVote={castVote}
+            voting={voting}
+            onVoteResult={handleVoteResult}
           />
         </main>
       )}
@@ -44,7 +61,7 @@ export default function App() {
   );
 }
 
-function VotingContent({ votingState, candidates, totalVotes, maxVotes, hasVoted, isConnected }) {
+function VotingContent({ votingState, candidates, totalVotes, maxVotes, hasVoted, isConnected, castVote, voting, onVoteResult }) {
   if (votingState === null) {
     return (
       <div className="text-center py-24 text-gray-400">
@@ -96,9 +113,34 @@ function VotingContent({ votingState, candidates, totalVotes, maxVotes, hasVoted
             candidate={c}
             totalVotes={totalVotes}
             isWinner={votingState === 2 && totalVotes > 0 && c.voteCount === maxVotes}
+            action={
+              votingState === 1 ? (
+                <VoteButton
+                  candidateId={c.id}
+                  candidateName={c.name}
+                  isConnected={isConnected}
+                  hasVoted={hasVoted}
+                  voting={voting}
+                  castVote={castVote}
+                  onResult={onVoteResult}
+                />
+              ) : null
+            }
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function Toast({ message, type }) {
+  const colors =
+    type === "success"
+      ? "bg-green-600 text-white"
+      : "bg-red-600 text-white";
+  return (
+    <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${colors}`}>
+      {message}
     </div>
   );
 }

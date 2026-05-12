@@ -5,12 +5,23 @@ import votingABI from "../abi/Voting.json";
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 const POLL_INTERVAL = 15000;
 
+function mapVoteError(e) {
+  const msg = (e?.reason ?? e?.message ?? "").toLowerCase();
+  if (msg.includes("already voted")) return "이미 투표하셨습니다.";
+  if (msg.includes("voting not active")) return "투표가 종료되었습니다.";
+  if (msg.includes("invalid candidate")) return "잘못된 후보자입니다.";
+  if (e?.code === "ACTION_REJECTED" || msg.includes("user rejected"))
+    return "사용자가 트랜잭션을 취소했습니다.";
+  return "트랜잭션 처리 중 오류가 발생했습니다.";
+}
+
 export function useVoting(account) {
   const [candidates, setCandidates] = useState([]);
   const [votingState, setVotingState] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [totalVotes, setTotalVotes] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [voting, setVoting] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!CONTRACT_ADDRESS || !window.ethereum) return;
@@ -51,5 +62,23 @@ export function useVoting(account) {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  return { candidates, votingState, hasVoted, totalVotes, loading, refresh };
+  const castVote = useCallback(async (candidateId) => {
+    if (!window.ethereum || !CONTRACT_ADDRESS) return { success: false, message: "지갑이 연결되지 않았습니다." };
+    setVoting(true);
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, votingABI, signer);
+      const tx = await contract.vote(candidateId);
+      await tx.wait();
+      await refresh();
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: mapVoteError(e) };
+    } finally {
+      setVoting(false);
+    }
+  }, [refresh]);
+
+  return { candidates, votingState, hasVoted, totalVotes, loading, refresh, castVote, voting };
 }

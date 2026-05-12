@@ -1,7 +1,7 @@
 const GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || "https://gateway.pinata.cloud";
 const FALLBACK = "https://placehold.co/200x200/e2e8f0/94a3b8?text=No+Image";
 
-export default function CandidateCard({ candidate, totalVotes, isWinner }) {
+export default function CandidateCard({ candidate, totalVotes, isWinner, action }) {
   const { name, photoCID, voteCount } = candidate;
   const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
   const imageUrl = photoCID ? `${GATEWAY}/ipfs/${photoCID}` : FALLBACK;
@@ -40,6 +40,8 @@ export default function CandidateCard({ candidate, totalVotes, isWinner }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+
+      {action && <div className="mt-1">{action}</div>}
     </div>
   );
 }
