@@ -6,6 +6,9 @@ import CandidateCard from "./components/CandidateCard";
 import VoteButton from "./components/VoteButton";
 import AdminPanel from "./components/AdminPanel";
 
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
+const ETHERSCAN_BASE = "https://sepolia.etherscan.io";
+
 export default function App() {
   const { account, isOwner, isConnected, chainOk, connect, switchToSepolia } =
     useWallet();
@@ -20,9 +23,6 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   }, []);
-
-  const maxVotes =
-    candidates.length > 0 ? Math.max(...candidates.map((c) => c.voteCount)) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -50,7 +50,6 @@ export default function App() {
               votingState={votingState}
               candidates={candidates}
               totalVotes={totalVotes}
-              maxVotes={maxVotes}
               hasVoted={hasVoted}
               isConnected={isConnected}
               castVote={castVote}
@@ -73,7 +72,7 @@ export default function App() {
   );
 }
 
-function VotingContent({ votingState, candidates, totalVotes, maxVotes, hasVoted, isConnected, castVote, voting, onVoteResult }) {
+function VotingContent({ votingState, candidates, totalVotes, hasVoted, isConnected, castVote, voting, onVoteResult }) {
   if (votingState === null) {
     return (
       <div className="text-center py-24 text-gray-400">
@@ -83,10 +82,25 @@ function VotingContent({ votingState, candidates, totalVotes, maxVotes, hasVoted
   }
 
   if (votingState === 0) {
+    if (candidates.length === 0) {
+      return (
+        <div className="text-center py-24">
+          <p className="text-2xl font-semibold text-gray-700">투표가 아직 시작되지 않았습니다.</p>
+          <p className="text-gray-400 mt-2">관리자 패널에서 후보자를 등록해 주세요.</p>
+        </div>
+      );
+    }
     return (
-      <div className="text-center py-24">
-        <p className="text-2xl font-semibold text-gray-700">투표가 아직 시작되지 않았습니다.</p>
-        <p className="text-gray-400 mt-2">관리자가 투표를 시작하면 여기에 후보자 목록이 표시됩니다.</p>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">등록된 후보자</h2>
+          <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full">투표 준비 중</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {candidates.map((c) => (
+            <CandidateCard key={c.id} candidate={c} totalVotes={0} isWinner={false} action={null} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -99,21 +113,77 @@ function VotingContent({ votingState, candidates, totalVotes, maxVotes, hasVoted
     );
   }
 
-  return (
-    <div className="flex flex-col gap-6">
-      {votingState === 1 && (
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">투표 현황</h2>
-          <span className="text-sm text-gray-400">총 {totalVotes}표</span>
-        </div>
-      )}
-      {votingState === 2 && (
-        <div className="text-center mb-2">
+  if (votingState === 2) {
+    const sorted = [...candidates].sort((a, b) => b.voteCount - a.voteCount);
+    let rank = 0;
+    let prevCount = -1;
+    const ranked = sorted.map((c) => {
+      if (c.voteCount !== prevCount) { rank += 1; prevCount = c.voteCount; }
+      return { ...c, rank };
+    });
+    const topCount = sorted[0]?.voteCount ?? 0;
+    const isWinner = (c) => totalVotes > 0 && c.voteCount === topCount;
+
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="text-center">
           <h2 className="text-xl font-bold text-gray-800">최종 투표 결과</h2>
           <p className="text-sm text-gray-400 mt-1">총 {totalVotes}표</p>
         </div>
-      )}
-      {isConnected && votingState === 1 && hasVoted && (
+        <div className="flex flex-col gap-3">
+          {ranked.map((c) => {
+            const pct = totalVotes > 0 ? Math.round((c.voteCount / totalVotes) * 100) : 0;
+            const winner = isWinner(c);
+            return (
+              <div
+                key={c.id}
+                className={`flex items-center gap-4 p-4 rounded-xl border ${winner ? "border-yellow-400 bg-yellow-50" : "border-gray-200 bg-white"}`}
+              >
+                <span className={`text-lg font-bold w-8 text-center flex-shrink-0 ${c.rank === 1 ? "text-yellow-500" : c.rank === 2 ? "text-gray-400" : c.rank === 3 ? "text-orange-400" : "text-gray-300"}`}>
+                  {c.rank === 1 ? "🥇" : c.rank === 2 ? "🥈" : c.rank === 3 ? "🥉" : `${c.rank}위`}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-900">{c.name}</span>
+                    {winner && (
+                      <span className="text-xs font-bold bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full">당선</span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${winner ? "bg-yellow-400" : "bg-blue-400"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{c.voteCount}표 ({pct}%)</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {CONTRACT_ADDRESS && (
+          <div className="text-center">
+            <a
+              href={`${ETHERSCAN_BASE}/address/${CONTRACT_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-500 hover:underline"
+            >
+              Etherscan에서 컨트랙트 확인 →
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-800">투표 현황</h2>
+        <span className="text-sm text-gray-400">총 {totalVotes}표</span>
+      </div>
+      {isConnected && hasVoted && (
         <div className="text-center text-sm text-blue-600 bg-blue-50 rounded-lg py-2">
           이미 투표하셨습니다.
         </div>
@@ -124,19 +194,17 @@ function VotingContent({ votingState, candidates, totalVotes, maxVotes, hasVoted
             key={c.id}
             candidate={c}
             totalVotes={totalVotes}
-            isWinner={votingState === 2 && totalVotes > 0 && c.voteCount === maxVotes}
+            isWinner={false}
             action={
-              votingState === 1 ? (
-                <VoteButton
-                  candidateId={c.id}
-                  candidateName={c.name}
-                  isConnected={isConnected}
-                  hasVoted={hasVoted}
-                  voting={voting}
-                  castVote={castVote}
-                  onResult={onVoteResult}
-                />
-              ) : null
+              <VoteButton
+                candidateId={c.id}
+                candidateName={c.name}
+                isConnected={isConnected}
+                hasVoted={hasVoted}
+                voting={voting}
+                castVote={castVote}
+                onResult={onVoteResult}
+              />
             }
           />
         ))}

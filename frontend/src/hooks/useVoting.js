@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ethers } from "ethers";
 import votingABI from "../abi/Voting.json";
 
@@ -32,6 +32,7 @@ export function useVoting(account) {
   const [totalVotes, setTotalVotes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
+  const timerRef = useRef(null);
 
   const refresh = useCallback(async () => {
     if (!CONTRACT_ADDRESS || !window.ethereum) return;
@@ -53,6 +54,10 @@ export function useVoting(account) {
       setCandidates(parsed);
       setVotingState(stateNum);
       setTotalVotes(total);
+      if (stateNum === 2 && timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       if (account) {
         const voted = await contract.hasVoted(account);
         setHasVoted(voted);
@@ -68,8 +73,13 @@ export function useVoting(account) {
 
   useEffect(() => {
     refresh();
-    const timer = setInterval(refresh, POLL_INTERVAL);
-    return () => clearInterval(timer);
+    timerRef.current = setInterval(refresh, POLL_INTERVAL);
+    return () => {
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [refresh]);
 
   const castVote = useCallback(async (candidateId) => {
