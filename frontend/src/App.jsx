@@ -4,11 +4,12 @@ import { useVoting } from "./hooks/useVoting";
 import Header from "./components/Header";
 import CandidateCard from "./components/CandidateCard";
 import VoteButton from "./components/VoteButton";
+import AdminPanel from "./components/AdminPanel";
 
 export default function App() {
   const { account, isOwner, isConnected, chainOk, connect, switchToSepolia } =
     useWallet();
-  const { candidates, votingState, hasVoted, totalVotes, loading, castVote, voting } =
+  const { candidates, votingState, hasVoted, totalVotes, loading, castVote, voting, addCandidate, startVoting, endVoting } =
     useVoting(account);
 
   const [toast, setToast] = useState(null);
@@ -43,19 +44,30 @@ export default function App() {
           <p className="text-gray-400">불러오는 중...</p>
         </main>
       ) : (
-        <main className="container mx-auto px-4 py-8 max-w-4xl">
-          <VotingContent
-            votingState={votingState}
-            candidates={candidates}
-            totalVotes={totalVotes}
-            maxVotes={maxVotes}
-            hasVoted={hasVoted}
-            isConnected={isConnected}
-            castVote={castVote}
-            voting={voting}
-            onVoteResult={handleVoteResult}
-          />
-        </main>
+        <>
+          <main className="container mx-auto px-4 py-8 max-w-4xl">
+            <VotingContent
+              votingState={votingState}
+              candidates={candidates}
+              totalVotes={totalVotes}
+              maxVotes={maxVotes}
+              hasVoted={hasVoted}
+              isConnected={isConnected}
+              castVote={castVote}
+              voting={voting}
+              onVoteResult={handleVoteResult}
+            />
+          </main>
+          {isOwner && (
+            <AdminPanel
+              candidates={candidates}
+              votingState={votingState}
+              addCandidate={addCandidate}
+              startVoting={startVoting}
+              endVoting={endVoting}
+            />
+          )}
+        </>
       )}
     </div>
   );

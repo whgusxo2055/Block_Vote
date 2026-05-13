@@ -5,6 +5,16 @@ import votingABI from "../abi/Voting.json";
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 const POLL_INTERVAL = 15000;
 
+function mapAdminError(e) {
+  const msg = (e?.reason ?? e?.message ?? "").toLowerCase();
+  if (msg.includes("only owner")) return "관리자 권한이 필요합니다.";
+  if (msg.includes("need at least 2")) return "후보자가 2명 이상 필요합니다.";
+  if (msg.includes("voting not")) return "현재 상태에서는 실행할 수 없습니다.";
+  if (e?.code === "ACTION_REJECTED" || msg.includes("user rejected"))
+    return "사용자가 트랜잭션을 취소했습니다.";
+  return "트랜잭션 처리 중 오류가 발생했습니다.";
+}
+
 function mapVoteError(e) {
   const msg = (e?.reason ?? e?.message ?? "").toLowerCase();
   if (msg.includes("already voted")) return "이미 투표하셨습니다.";
@@ -80,5 +90,24 @@ export function useVoting(account) {
     }
   }, [refresh]);
 
-  return { candidates, votingState, hasVoted, totalVotes, loading, refresh, castVote, voting };
+  const sendAdminTx = useCallback(async (method, ...args) => {
+    if (!window.ethereum || !CONTRACT_ADDRESS) return { success: false, message: "지갑이 연결되지 않았습니다." };
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, votingABI, signer);
+      const tx = await contract[method](...args);
+      await tx.wait();
+      await refresh();
+      return { success: true };
+    } catch (e) {
+      return { success: false, message: mapAdminError(e) };
+    }
+  }, [refresh]);
+
+  const addCandidate = useCallback((name, cid) => sendAdminTx("addCandidate", name, cid), [sendAdminTx]);
+  const startVoting = useCallback(() => sendAdminTx("startVoting"), [sendAdminTx]);
+  const endVoting = useCallback(() => sendAdminTx("endVoting"), [sendAdminTx]);
+
+  return { candidates, votingState, hasVoted, totalVotes, loading, refresh, castVote, voting, addCandidate, startVoting, endVoting };
 }
