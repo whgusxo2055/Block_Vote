@@ -35,9 +35,24 @@ async function main() {
     console.warn("⚠️  artifacts 없음 — npx hardhat compile 먼저 실행하세요.");
   }
 
-  console.log("\n📋 다음 단계:");
-  console.log("   frontend/.env 에 추가:");
-  console.log(`   VITE_CONTRACT_ADDRESS=${contractAddress}`);
+  // frontend/.env의 VITE_CONTRACT_ADDRESS 자동 업데이트
+  const envPath = path.join(__dirname, "../frontend/.env");
+  if (fs.existsSync(envPath)) {
+    let envContent = fs.readFileSync(envPath, "utf8");
+    if (envContent.includes("VITE_CONTRACT_ADDRESS=")) {
+      envContent = envContent.replace(
+        /VITE_CONTRACT_ADDRESS=.*/,
+        `VITE_CONTRACT_ADDRESS=${contractAddress}`
+      );
+    } else {
+      envContent += `\nVITE_CONTRACT_ADDRESS=${contractAddress}`;
+    }
+    fs.writeFileSync(envPath, envContent);
+    console.log("✅ frontend/.env 업데이트 완료");
+  } else {
+    console.log("\n📋 다음 단계 — frontend/.env 에 추가:");
+    console.log(`   VITE_CONTRACT_ADDRESS=${contractAddress}`);
+  }
 }
 
 main().catch((error) => {
