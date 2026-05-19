@@ -97,3 +97,20 @@ Revert 메시지: `"Only owner"` / `"Need at least 2 candidates"` / `"Voting not
 | `frontend/.env` | `VITE_CONTRACT_ADDRESS` | 배포된 컨트랙트 주소 |
 | `frontend/.env` | `VITE_PINATA_JWT` | Pinata Files:Write 스코프 JWT |
 | `frontend/.env` | `VITE_IPFS_GATEWAY` | IPFS 게이트웨이 URL |
+
+## PM2 Services
+
+| Port | Name | Type |
+|------|------|------|
+| 5173 | blockvote-5173 | Vite (React) |
+
+**Terminal Commands:**
+```bash
+pm2 start ecosystem.config.cjs   # 최초 실행 (config 파일 사용)
+pm2 start all                    # 이후 실행
+pm2 stop all / pm2 restart all
+pm2 start blockvote-5173 / pm2 stop blockvote-5173
+pm2 logs / pm2 status / pm2 monit
+pm2 save                         # 프로세스 목록 저장
+pm2 resurrect                    # 저장된 목록 복원
+```
