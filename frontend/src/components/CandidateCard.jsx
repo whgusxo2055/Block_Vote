@@ -1,10 +1,16 @@
-const GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || "https://gateway.pinata.cloud";
+const GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || "https://ipfs.io";
 const FALLBACK = "https://placehold.co/200x200/e2e8f0/94a3b8?text=No+Image";
+
+// CIDv0(Qm...)만 공개 IPFS 게이트웨이로 조회 가능. CIDv1(baf...)은 즉시 fallback.
+function ipfsUrl(cid) {
+  if (!cid || !cid.startsWith("Qm")) return FALLBACK;
+  return `${GATEWAY}/ipfs/${cid}`;
+}
 
 export default function CandidateCard({ candidate, totalVotes, isWinner, action }) {
   const { name, photoCID, voteCount } = candidate;
   const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
-  const imageUrl = photoCID ? `${GATEWAY}/ipfs/${photoCID}` : FALLBACK;
+  const imageUrl = ipfsUrl(photoCID);
 
   return (
     <div

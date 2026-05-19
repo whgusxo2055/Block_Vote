@@ -1,8 +1,13 @@
 import { useState } from "react";
 import CandidateForm from "./CandidateForm";
 
-const GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || "https://gateway.pinata.cloud";
+const GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || "https://ipfs.io";
 const FALLBACK = "https://placehold.co/40x40/e2e8f0/94a3b8?text=?";
+
+function ipfsUrl(cid) {
+  if (!cid || !cid.startsWith("Qm")) return FALLBACK;
+  return `${GATEWAY}/ipfs/${cid}`;
+}
 
 export default function AdminPanel({ candidates, votingState, addCandidate, startVoting, endVoting }) {
   const [ctrlLoading, setCtrlLoading] = useState(null); // "start" | "end" | null
@@ -47,7 +52,7 @@ export default function AdminPanel({ candidates, votingState, addCandidate, star
               {candidates.map((c) => (
                 <li key={c.id} className="flex items-center gap-3">
                   <img
-                    src={c.photoCID ? `${GATEWAY}/ipfs/${c.photoCID}` : FALLBACK}
+                    src={ipfsUrl(c.photoCID)}
                     alt={c.name}
                     onError={(e) => { e.currentTarget.src = FALLBACK; }}
                     className="w-10 h-10 rounded-lg object-cover bg-gray-100 flex-shrink-0"
